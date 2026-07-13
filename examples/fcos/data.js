@@ -40,7 +40,7 @@ window.KG = {
     'boot-seq':  { name: 'Boot sequence',      color: '#5e35b1' },
     'pi5':       { name: 'Pi 5 / CM5 blocker', color: '#c62828' },
     'immut':     { name: 'Immutability path',  color: '#00897b' },
-    'appliance': { name: 'Current appliance',  color: '#ef6c00' },
+    'appliance': { name: 'Reference appliance', color: '#ef6c00' },
   },
 
   nodes: [
@@ -173,8 +173,8 @@ window.KG = {
       desc: 'An ARM board certified to Arm SystemReady (Ampere, SolidRun HoneyComb, NXP LX2160…) that boots stock images.' },
     { id: 'hw_cm4', label: 'CM4', group: 'Hardware',
       facets: { tier: '3', ecosystem: 'Broadcom-Pi', status: 'works-today', abstraction: 'product', stack: 'hardware' }, layers: ['appliance'],
-      short: 'Current CalTon appliance; boots FCOS from eMMC.',
-      desc: 'RPi CM4 = Raspberry Pi Compute Module 4: the current CalTon appliance hardware; boots FCOS from eMMC via a grafted U-Boot.' },
+      short: 'A deployed appliance board; boots FCOS from eMMC.',
+      desc: 'RPi CM4 = Raspberry Pi Compute Module 4: a deployed appliance board; boots FCOS from eMMC via a grafted U-Boot.' },
     { id: 'hw_pi4', label: 'RPi 4', group: 'Hardware',
       facets: { tier: '3', ecosystem: 'Broadcom-Pi', status: 'works-today', abstraction: 'product', stack: 'hardware' }, layers: [],
       short: 'Tier-3 SBC; Fedora IoT reference platform.',

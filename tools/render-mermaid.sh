@@ -16,6 +16,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMG_DIR="${1:-${ROOT}/examples/fcos/diagrams}"
+IMG_DIR="$(cd "${IMG_DIR}" && pwd)"   # absolute path (podman -v needs it)
 FORMAT="${2:-${FORMAT:-png}}"
 BG="${BG:-white}"
 SCALE="${SCALE:-3}"

@@ -60,6 +60,7 @@
   (function () {
     var p = new URLSearchParams(location.search);
     var f = p.get('data') || '../examples/fcos/data.js';
+    if (/^examples\//.test(f)) f = '../' + f;   // allow repo-root-relative convenience
     document.write('<scr' + 'ipt src="' + f + '"><\/scr' + 'ipt>');
   })();
 </script>

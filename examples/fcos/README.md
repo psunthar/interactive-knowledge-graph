@@ -23,11 +23,10 @@ Contents:
 
 ## Domain context
 
-The subject-matter background — why the Pi 5 / CM5 is currently blocked, the
-hardware tiers, the boot chain, U-Boot versus EDK2 — lives in the CalTon EMS
-provisioning repository (`ems-fcos-provisioning`), where this knowledge
-originated. That repository keeps the provisioning procedures; this example keeps
-the graph.
+The subject-matter background (why the Pi 5 / CM5 is currently blocked, the
+hardware tiers, the boot chain, U-Boot versus EDK2) originated in a separate
+appliance-provisioning project. This example keeps only the knowledge graph; the
+provisioning procedures are out of scope here.
 
 ## Modelling decisions worth noting (see METHOD.md)
 

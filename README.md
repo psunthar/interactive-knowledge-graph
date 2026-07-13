@@ -15,6 +15,34 @@ Two parts:
 
 The FCOS / immutable-OS graph under `examples/fcos/` is a worked implementation.
 
+## Screenshots
+
+The interactive renderer (`src/graph.html`) on the FCOS example:
+
+![Interactive knowledge graph](docs/screenshots/interactive-fcos.png)
+
+Click a node to focus it: its outgoing edges turn red, incoming edges blue, and its
+connections fan into a ring, with the description in the side panel.
+
+![Focused node](docs/screenshots/interactive-fcos-focus.png)
+
+The same renderer on the example **book** graph (`examples/book/`), coloured by Part:
+
+![Book graph coloured by part](docs/screenshots/interactive-book-bypart.png)
+
+Static Mermaid diagrams of the same subject (`examples/fcos/diagrams/`, rendered with
+`tools/render-mermaid.sh`):
+
+![Decision flowchart](docs/screenshots/diagram-decision-flowchart.png)
+
+## Live demo
+
+With GitHub Pages enabled for this repository, the interactive graph runs in the
+browser without cloning:
+
+- FCOS example: `https://psunthar.github.io/interactive-knowledge-graph/src/graph.html`
+- Book example: `https://psunthar.github.io/interactive-knowledge-graph/src/graph.html?data=examples/book/data.js`
+
 ## Layout
 
 ```
@@ -75,6 +103,5 @@ A dataset assigns `window.KG`:
 
 ## Provenance
 
-This began as diagrams inside the CalTon EMS provisioning repository, and was
-extracted here so the tool and the method are reusable across topics. See
-`examples/fcos/README.md`.
+This began as a set of diagrams for one technical topic and was extracted here so
+the tool and the method are reusable across topics. See `examples/fcos/README.md`.
