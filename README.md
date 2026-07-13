@@ -40,8 +40,8 @@ Static Mermaid diagrams of the same subject (`examples/fcos/diagrams/`, rendered
 With GitHub Pages enabled for this repository, the interactive graph runs in the
 browser without cloning:
 
-- FCOS example: `https://psunthar.github.io/interactive-knowledge-graph/src/graph.html`
-- Book example: `https://psunthar.github.io/interactive-knowledge-graph/src/graph.html?data=examples/book/data.js`
+- [FCOS example (interactive)](https://psunthar.github.io/interactive-knowledge-graph/src/graph.html)
+- [Book example (interactive)](https://psunthar.github.io/interactive-knowledge-graph/src/graph.html?data=examples/book/data.js)
 
 ## Layout
 
