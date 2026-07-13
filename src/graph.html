@@ -108,10 +108,29 @@
   const byId = Object.fromEntries(G.nodes.map(n => [n.id, n]));
   const flat = (id) => (byId[id] ? byId[id].label.replace(/\n/g, ' ') : id);
 
-  // degree per node (hub sizing)
+  // degree per node
   const deg = {}; G.nodes.forEach(n => deg[n.id] = 0);
   G.edges.forEach(e => { deg[e.source]++; deg[e.target]++; });
   const maxDeg = Math.max(...Object.values(deg));
+
+  // reach = number of DESCENDANTS reachable by following OUTGOING edges (children,
+  // and their children, across all generations). Cycle-safe. This is what sizes a
+  // node: a root that everything flows out of gets the largest diameter.
+  const outBySrc = {}; G.nodes.forEach(n => outBySrc[n.id] = []);
+  G.edges.forEach(e => { if (outBySrc[e.source]) outBySrc[e.source].push(e.target); });
+  function reachOf(id) {
+    const seen = new Set(); const stack = outBySrc[id].slice();
+    while (stack.length) {
+      const t = stack.pop();
+      if (seen.has(t)) continue;
+      seen.add(t);
+      for (const nx of (outBySrc[t] || [])) if (!seen.has(nx)) stack.push(nx);
+    }
+    return seen.size;
+  }
+  const reach = {}; G.nodes.forEach(n => reach[n.id] = reachOf(n.id));
+  const maxReach = Math.max(1, ...Object.values(reach));
+  const maxReachId = Object.keys(reach).sort((a, b) => reach[b] - reach[a])[0];
 
   // ---------- colour-by facet plumbing ----------
   let colorBy = 'category';
@@ -134,7 +153,7 @@
   }
 
   const elements = [
-    ...G.nodes.map(n => ({ data: { id: n.id, label: n.label, group: n.group, color: colorForNode(n.id), deg: deg[n.id] } })),
+    ...G.nodes.map(n => ({ data: { id: n.id, label: n.label, group: n.group, color: colorForNode(n.id), deg: deg[n.id], reach: reach[n.id] } })),
     ...G.edges.map((e, i) => ({ data: { id: 'e' + i, source: e.source, target: e.target, label: e.label } })),
   ];
 
@@ -147,7 +166,9 @@
         'color': '#ffffff', 'font-size': 8, 'font-weight': 'normal',
         'text-wrap': 'wrap', 'text-max-width': 78, 'text-valign': 'center', 'text-halign': 'center',
         'text-outline-color': 'data(color)', 'text-outline-width': 2.4, 'text-outline-opacity': 1,
-        'width': 'mapData(deg, 1, ' + maxDeg + ', 34, 78)', 'height': 'mapData(deg, 1, ' + maxDeg + ', 34, 78)',
+        // diameter scales with descendant-reach (see reachOf): the source of the
+        // largest outgoing subtree is the biggest node.
+        'width': 'mapData(reach, 0, ' + maxReach + ', 26, 88)', 'height': 'mapData(reach, 0, ' + maxReach + ', 26, 88)',
         'border-width': 1, 'border-color': 'rgba(255,255,255,0.7)',
       }},
       { selector: 'edge', style: {
@@ -328,8 +349,10 @@
     const name = b.getAttribute('data-layout');
     if (name === 'cose') return runForce();
     const opts = { name, animate: true, padding: 40 };
-    if (name === 'concentric') Object.assign(opts, { concentric: (n) => n.degree(), levelWidth: () => 3, minNodeSpacing: 40 });
-    if (name === 'breadthfirst') Object.assign(opts, { directed: true, spacingFactor: 1.1 });
+    // concentric: rank rings by descendant-reach (largest reach in the centre)
+    if (name === 'concentric') Object.assign(opts, { concentric: (n) => reach[n.id()], levelWidth: () => 3, minNodeSpacing: 40 });
+    // tree-ish: root the tree at the highest-reach node -> largest on top, smaller below
+    if (name === 'breadthfirst') Object.assign(opts, { directed: true, spacingFactor: 1.1, roots: maxReachId ? ('#' + maxReachId) : undefined });
     capture = true; cy.layout(opts).run();
   }));
   const syncLabels = () => { v_rep.textContent = f_rep.value; v_len.textContent = f_len.value; v_el.textContent = f_el.value;
