@@ -43,7 +43,23 @@ src/graph.html?data=<path-to-your-data.js>
 1. Follow `METHOD.md`, Steps 0 to 7.
 2. Copy `examples/fcos/data.js` to `examples/<topic>/data.js` and replace the
    contents.
-3. Open `src/graph.html?data=examples/<topic>/data.js`.
+3. Validate the structure: `node tools/validate.mjs examples/<topic>/data.js`.
+4. Open `src/graph.html?data=examples/<topic>/data.js`.
+
+## Validate a dataset
+
+`tools/validate.mjs` (Node.js, no dependencies) checks a dataset for structural
+faults that a renderer would otherwise hit at load time or ignore: a node whose
+category is undeclared, an edge whose endpoint is not a node, a facet value outside
+its allowed set, duplicate ids, orphan nodes. The dataset shape is documented in
+`schema/kg.schema.json`.
+
+```
+node tools/validate.mjs examples/fcos/data.js
+```
+
+This finds broken structure; it does not find missing domain edges. For that, use
+the exhaustive pairwise sweep in `METHOD.md` (Step 5).
 
 ## Data model
 

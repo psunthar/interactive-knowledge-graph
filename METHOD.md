@@ -185,9 +185,24 @@ these checks automatically:
   the allowed set.
 - **Orphans**: report nodes with no edges, and confirm that each is intended.
 
-A JSON Schema and a short validator script perform all of this in seconds. Such a
-check would have caught the missing architecture edges in this project at author
-time, rather than at render time.
+In this toolkit a dataset is the object `window.KG`, with the keys `groups`,
+`facets`, `layers`, `nodes` and `edges` (the README gives the full model). Its
+shape is described in `schema/kg.schema.json`. The cross-reference checks above,
+which a JSON Schema cannot express, are run by `tools/validate.mjs`:
+
+```
+node tools/validate.mjs examples/fcos/data.js
+```
+
+The script reports **errors** (a node whose category is not declared, an edge whose
+endpoint is not a node, a facet value outside its allowed set) and **warnings**
+(orphan nodes, a facet left unset on some nodes). A check of this kind catches a
+dangling edge or a mistyped category at author time, rather than at render time.
+
+Note the division of labour. This validator finds broken **structure**. It does not
+find a missing **domain** edge; that is the work of the pairwise sweep in Step 5. A
+validator would never have found the missing GRUB-to-UEFI edge, and the sweep would
+never check that every edge endpoint resolves to a node. Run both.
 
 ## 10. Step 7: Close the loop
 
@@ -204,7 +219,7 @@ generic Cytoscape renderer (`src/graph.html`). The same data can then be:
 
 - **rendered** for exploration, with hover notes, a details panel, colour-by-facet
   and show-layer controls;
-- **validated** against a JSON Schema;
+- **validated** with `tools/validate.mjs` against `schema/kg.schema.json`;
 - **exported** to Cypher and loaded into a graph database (Neo4j, or the
   server-less Kùzu) for querying.
 

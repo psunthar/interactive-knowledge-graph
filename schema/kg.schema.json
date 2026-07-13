@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/psunthar/interactive-knowledge-graph/schema/kg.schema.json",
+  "title": "Interactive knowledge graph dataset (window.KG)",
+  "description": "Shape of the object a dataset file assigns to window.KG. Cross-reference rules (edge endpoints must be node ids; facet values must be declared; node group/facets/layers must be declared) are NOT expressible here and are enforced by tools/validate.mjs.",
+  "type": "object",
+  "required": ["groups", "nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "title": { "type": "string" },
+    "groups": {
+      "type": "object",
+      "description": "primary category -> colour",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string" }
+    },
+    "facets": {
+      "type": "object",
+      "description": "facet key -> { name, values: value -> colour }",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["name", "values"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "values": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      }
+    },
+    "layers": {
+      "type": "object",
+      "description": "layer id -> { name, color }",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["name", "color"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "color": { "type": "string" }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "group"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "group": { "type": "string", "description": "must be a key of groups{}" },
+          "short": { "type": "string", "description": "hover tooltip (~2 lines)" },
+          "desc": { "type": "string", "description": "side-panel detail" },
+          "facets": {
+            "type": "object",
+            "description": "facet key -> value; each key must be in facets{}, each value in that facet's values",
+            "additionalProperties": { "type": "string" }
+          },
+          "layers": {
+            "type": "array",
+            "description": "layer ids; each must be a key of layers{}",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "target", "label"],
+        "additionalProperties": false,
+        "properties": {
+          "source": { "type": "string", "description": "must be a node id" },
+          "target": { "type": "string", "description": "must be a node id" },
+          "label": { "type": "string", "description": "the relationship verb" }
+        }
+      }
+    }
+  }
+}
