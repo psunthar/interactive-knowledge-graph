@@ -1,0 +1,20 @@
+%% Which immutable OS + hardware to choose — decision flowchart
+%% Render: scripts/render-mermaid.sh   (or: mmdc -i decision-flowchart.mmd -o decision-flowchart.png)
+flowchart TD
+    A[Need immutable OS with atomic rollback?] -->|Yes - keep this requirement| B{Is the Raspberry Pi form factor a hard requirement?}
+    A -->|No| Z[Different problem - out of scope]
+
+    B -->|No, x86 acceptable| T1
+    B -->|Yes, but CM4 or Pi 4 is fine| T2
+    B -->|Yes, must be Pi 5 or CM5| T3
+
+    T1[TIER 1 - x86 industrial box-PC + FCOS<br/>keep Ignition and deploy flow<br/>real UEFI, zero firmware glue<br/>only NIC names change<br/>RECOMMENDED - highest reliability]
+    T2[Fedora IoT on CM4 or Pi 4<br/>same rpm-ostree and Ignition<br/>Pi images ship boot bits, no U-Boot grafting<br/>or keep FCOS-on-CM4<br/>or custom bootc image with U-Boot baked in]
+    T3[openSUSE MicroOS<br/>btrfs snapshots + transactional-update rollback<br/>SUSE upstreamed Pi 5 U-Boot Nov 2025<br/>bootc not yet - needs BCM2712 U-Boot to exist]
+
+    T1 --> R[Reliable immutability + rollback achieved]
+    T2 --> R
+    T3 --> R
+
+    classDef rec fill:#1b5e20,stroke:#66bb6a,color:#fff;
+    class T1 rec;

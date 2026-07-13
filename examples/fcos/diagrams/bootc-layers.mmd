@@ -1,0 +1,21 @@
+%% What bootc changes vs what it does not — orthogonal to the boot contract
+%% Render: scripts/render-mermaid.sh   (or: mmdc -i bootc-layers.mmd -o bootc-layers.png)
+flowchart TB
+    subgraph SOLVES["bootc SOLVES: build/ship/update"]
+        direction TB
+        c1[OS is an OCI image<br/>built with a Containerfile] --> c2[Atomic A-B deploy + rollback<br/>via ostree / composefs]
+        c2 --> c3[Firmware carried reproducibly<br/>COPY U-Boot + dtb + config.txt into image]
+        c3 --> c4[Firmware versioned + rolled back<br/>with the whole OS]
+    end
+    subgraph NOPE["bootc does NOT change the boot contract"]
+        direction TB
+        u1[Still needs firmware to start a bootloader] --> u2[UEFI on x86 / SystemReady ARM<br/>or grafted U-Boot / EDK2 on a bare SBC]
+        u2 --> u3[U-Boot must EXIST for the SoC<br/>Pi 4 yes - Pi 5 / CM5 not yet]
+        u3 --> u4[Install must arrange the Pi boot partition<br/>GPU ROM layout, not the generic ESP]
+    end
+    SOLVES -.->|orthogonal layers| NOPE
+
+    classDef good fill:#1b5e20,stroke:#66bb6a,color:#fff;
+    classDef warn fill:#7f1d1d,stroke:#ef5350,color:#fff;
+    class c1,c2,c3,c4 good;
+    class u1,u2,u3,u4 warn;

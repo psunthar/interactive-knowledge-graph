@@ -1,0 +1,9 @@
+# Generated diagram/markmap outputs — regenerate from source.
+examples/**/diagrams/*.png
+examples/**/diagrams/*.svg
+examples/**/diagrams/*.pdf
+examples/**/*.offline.html
+
+# Editor / OS cruft
+.DS_Store
+*.swp

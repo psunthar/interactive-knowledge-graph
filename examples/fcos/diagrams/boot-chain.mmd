@@ -1,0 +1,15 @@
+%% Boot chain by firmware class — why the tiers differ
+%% Render: scripts/render-mermaid.sh   (or: mmdc -i boot-chain.mmd -o boot-chain.png)
+flowchart LR
+    subgraph PC["Tier 1 / 2: built-in UEFI"]
+        direction LR
+        p1[SoC boot ROM] --> p2[UEFI in board flash] --> p3[GRUB on ESP] --> p4[kernel]
+    end
+    subgraph SBC["Tier 3: bare SBC"]
+        direction LR
+        s1[SoC boot ROM] --> s2[vendor loader<br/>EEPROM or SD] --> s3[U-Boot or EDK2<br/>you place on boot partition<br/>or bake into a bootc image] --> s4[GRUB on ESP] --> s5[kernel + dtb]
+    end
+    subgraph BLK["Blocked: Pi 5 / CM5"]
+        direction LR
+        b1[SoC boot ROM] --> b2[vendor loader] --> b3[no mainline U-Boot for BCM2712<br/>EDK2 is WIP]
+    end

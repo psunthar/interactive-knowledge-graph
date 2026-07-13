@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FCOS / immutable-OS on industrial hardware — mindmap</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  #mm { display: block; width: 100vw; height: 100vh; }
+</style>
+<!-- markmap from CDN (needs internet at open time). We instantiate manually
+     instead of using the autoloader so we can recenter on the toggled node.
+     markmap-lib and markmap-view both publish to window.markmap, so capture each
+     one right after its <script> loads before the next can clobber it. -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18/dist/browser/index.iife.js"></script>
+<script>window.__lib = window.markmap || {};</script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18"></script>
+<script>window.__view = window.markmap || {};</script>
+</head>
+<body>
+<svg id="mm"></svg>
+
+<!-- The outline. Edit this Markdown and reload — this text IS the source. -->
+<script type="text/markdown" id="source">
+# FCOS & immutable OS on industrial hardware
+
+## Requirement: immutability
+- Immutable root filesystem
+- A/B atomic updates
+- Reliable rollback
+- Engines
+  - ostree / rpm-ostree
+  - btrfs snapshots + snapper
+  - **bootc** — OS as an OCI image
+
+## bootc facts
+- Successor image model — FCOS & Fedora IoT converge
+- Build with a `Containerfile`, push to a registry
+- `bootc install` / `upgrade` / `switch` / `rollback`
+- Uses ostree + composefs underneath
+- **Does NOT remove the UEFI requirement**
+- Can bake U-Boot + firmware into the image
+
+## Axis 1 — architecture
+- `x86_64` (Intel / AMD)
+- `aarch64` (ARMv8)
+- `ppc64le` / `s390x` (not SBC)
+
+## Axis 2 — firmware class
+- PC-class UEFI + ACPI
+- SystemReady SR / ES
+- UEFI + device-tree
+- Bare vendor-boot SBC → graft U-Boot / EDK2
+- No UEFI path
+
+## Boot-chain layers
+- SoC boot ROM (in silicon)
+- Platform firmware / UEFI (board SPI flash)
+- GRUB (ESP on disk)
+- Kernel + dtb (on disk)
+
+## Hardware tiers
+- Tier 1 — x86 box-PC · effort **none**
+- Tier 2 — SystemReady ARM · effort **none**
+- Tier 3 — bare SBC / DIY · **= CM4 today**
+- Blocked · **= Pi 5 / CM5 today**
+
+## OS options (immutable family)
+- FCOS (ostree)
+- Fedora IoT — sibling; Ignition; Pi images
+- openSUSE MicroOS — Pi 5 works; SUSE U-Boot
+- Custom bootc image — you own the build
+</script>
+
+<script>
+  const Transformer = (window.__lib && window.__lib.Transformer) || window.markmap.Transformer;
+  const Markmap = (window.__view && window.__view.Markmap) || window.markmap.Markmap;
+  const transformer = new Transformer();
+  const md = document.getElementById('source').textContent;
+  const { root } = transformer.transform(md);
+
+  const mm = Markmap.create('#mm', {
+    duration: 600,          // animation length for layout + recenter
+    autoFit: false,         // we do our own, per-node centering instead of fit-all
+    initialExpandLevel: 2,
+    colorFreezeLevel: 2,
+    spacingVertical: 8,
+  }, root);
+  window.mm = mm;           // handy for console tinkering
+
+  // Recenter smoothly on whichever node you toggle. markmap's fold-circle click
+  // calls mm.toggleNode(); we wrap it so the view pans/zooms to that node after
+  // the layout updates. Degrade gracefully across markmap-view versions.
+  const centerOn = (node) => {
+    if (typeof mm.centerNode === 'function') return mm.centerNode(node, { padding: 80 });
+    if (typeof mm.ensureVisible === 'function') return mm.ensureVisible(node, 80);
+    if (typeof mm.fit === 'function') return mm.fit();
+  };
+  if (typeof mm.toggleNode === 'function') {
+    const origToggle = mm.toggleNode.bind(mm);
+    mm.toggleNode = async (node, recursive) => {
+      await origToggle(node, recursive);
+      try { await centerOn(node); } catch (e) { /* ignore */ }
+    };
+  }
+
+  mm.fit();                 // initial fit to viewport
+</script>
+</body>
+</html>

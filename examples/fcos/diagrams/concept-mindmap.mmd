@@ -1,0 +1,43 @@
+%% FCOS / immutable-OS on industrial hardware — concept map
+%% Render: scripts/render-mermaid.sh   (or: mmdc -i concept-mindmap.mmd -o concept-mindmap.png)
+mindmap
+  root((FCOS and immutable OS on industrial hardware))
+    Requirement immutability
+      Immutable root filesystem
+      A-B atomic updates
+      Reliable rollback
+      Engine ostree rpm-ostree
+      Engine btrfs snapshots snapper
+      Engine bootc builds OS as OCI image
+    bootc facts
+      Successor image model - FCOS and Fedora IoT converge
+      Build with Containerfile push to registry
+      bootc install upgrade switch rollback
+      Uses ostree composefs underneath
+      Does NOT remove the UEFI requirement
+      Can bake U-Boot and firmware into the image
+    Axis 1 architecture
+      x86_64 Intel AMD
+      aarch64 ARMv8
+      ppc64le s390x not SBC
+    Axis 2 firmware class
+      PC-class UEFI plus ACPI
+      SystemReady SR ES
+      UEFI plus device-tree
+      Bare vendor-boot SBC graft U-Boot or EDK2
+      No UEFI path
+    Boot chain layers
+      SoC boot ROM in silicon
+      Platform firmware UEFI in board SPI flash
+      GRUB in ESP on disk
+      Kernel and dtb on disk
+    Hardware tiers
+      Tier 1 x86 box-PC effort none
+      Tier 2 SystemReady ARM effort none
+      Tier 3 bare SBC DIY equals CM4 today
+      Blocked equals Pi5 CM5 today
+    OS options immutable family
+      FCOS ostree
+      Fedora IoT sibling Ignition Pi images
+      openSUSE MicroOS Pi5 works SUSE u-boot
+      Custom bootc image you own the build

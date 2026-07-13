@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Knowledge graph — Cytoscape.js</title>
+<style>
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+  #cy { position: absolute; top: 0; bottom: 0; left: 0; right: 320px; }
+  .panel { position: absolute; z-index: 10; background: rgba(255,255,255,0.96);
+    border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.15); font-size: 12px; }
+  #controls { top: 10px; left: 10px; padding: 10px 12px; max-width: 250px; max-height: 94vh; overflow-y: auto; }
+  #controls h1 { font-size: 13px; margin: 0 0 6px; }
+  #controls button { font-size: 11px; margin: 2px 2px 0 0; cursor: pointer; }
+  #controls select, #search { font-size: 12px; padding: 2px 4px; }
+  .fld { margin-top: 6px; } .fld label { color:#444; margin-right: 4px; }
+  #search { width: 100%; box-sizing: border-box; margin-top: 6px; }
+  .row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .row > label { flex: 0 0 90px; color: #333; }
+  .row input[type=range] { flex: 1; }
+  .row span { flex: 0 0 38px; text-align: right; color: #555; }
+  #forces { margin-top: 8px; border-top: 1px solid #eee; padding-top: 6px; display: none; }
+  #legend { margin-top: 8px; line-height: 1.7; }
+  #legend .lg { display: flex; align-items: center; user-select: none; }
+  #legend .lgname { cursor: pointer; }
+  #legend .lg.off .lgname { opacity: 0.35; text-decoration: line-through; }
+  #legend .only { cursor: pointer; color: #1565c0; font-size: 10px; margin-left: 6px; visibility: hidden; }
+  #legend .lg:hover .only { visibility: visible; }
+  #legend .only.active { visibility: visible; font-weight: 700; }
+  .chip { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+  .hint { color: #555; margin-top: 8px; }
+
+  #details { top: 0; right: 0; width: 300px; height: 100%; border-radius: 0; border-left: 1px solid #ddd;
+    padding: 14px 16px; overflow-y: auto; box-shadow: -2px 0 8px rgba(0,0,0,.08); }
+  #details .dh { font-size: 16px; font-weight: 700; display: flex; align-items: center; }
+  #details .dh .chip { width: 14px; height: 14px; }
+  #details .grp { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin: 2px 0 8px 19px; }
+  #details .tags { margin: 0 0 10px; }
+  #details .tag { display: inline-block; font-size: 10px; background: #eef1f4; color: #37474f; border: 1px solid #dde3e8;
+    border-radius: 10px; padding: 1px 7px; margin: 0 3px 3px 0; }
+  #details .tag.lyr { background: #ede7f6; color: #4527a0; border-color: #d1c4e9; }
+  #details .desc { line-height: 1.5; color: #222; margin: 0 0 12px; }
+  #details .sec { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 3px; }
+  #details .sec.out { color: #c62828; } #details .sec.in { color: #1565c0; }
+  #details ul { margin: 0; padding-left: 0; list-style: none; }
+  #details li { padding: 2px 0; line-height: 1.35; border-bottom: 1px solid #f0f0f0; }
+  #details .v { color: #c62828; font-style: italic; } #details .vin { color: #1565c0; font-style: italic; }
+  #details .muted { color: #888; } #details .idle { color: #888; line-height: 1.5; }
+
+  #tip { position: fixed; z-index: 20; display: none; max-width: 230px; pointer-events: none;
+    background: rgba(20,20,20,0.92); color: #fff; font-size: 11.5px; line-height: 1.4; padding: 6px 9px;
+    border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  #tip b { font-size: 12.5px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<script>
+  // Load the graph dataset. Default is the bundled FCOS example; override with
+  //   graph.html?data=<relative-or-absolute-path-to-a-data.js>
+  // A dataset is a script that assigns window.KG = { title?, groups, facets, layers, nodes, edges }.
+  (function () {
+    var p = new URLSearchParams(location.search);
+    var f = p.get('data') || '../examples/fcos/data.js';
+    document.write('<scr' + 'ipt src="' + f + '"><\/scr' + 'ipt>');
+  })();
+</script>
+</head>
+<body>
+<div id="controls" class="panel">
+  <h1>Knowledge graph</h1>
+  <div>Layout:
+    <div>
+      <button data-layout="cose">force</button>
+      <button data-layout="concentric">concentric</button>
+      <button data-layout="breadthfirst">tree-ish</button>
+      <button data-layout="circle">circle</button>
+      <button data-layout="grid">grid</button>
+    </div>
+  </div>
+  <input id="search" list="nodelist" placeholder="search a node…" />
+  <datalist id="nodelist"></datalist>
+  <div class="fld"><label>Colour by</label><select id="colorby"></select></div>
+  <div class="fld"><label>Show layer</label><select id="layer"></select></div>
+  <div style="margin-top:6px">
+    <button id="toggleForces">force tuning ▾</button>
+    <button id="png">save PNG</button>
+    <button id="reset">reset</button>
+  </div>
+  <div id="forces">
+    <div class="row"><label>node repulsion</label><input id="f_rep" type="range" min="1000" max="40000" step="500" value="14000"><span id="v_rep"></span></div>
+    <div class="row"><label>edge length</label><input id="f_len" type="range" min="40" max="320" step="10" value="150"><span id="v_len"></span></div>
+    <div class="row"><label>spring const</label><input id="f_el" type="range" min="0" max="200" step="5" value="35"><span id="v_el"></span></div>
+    <div class="row"><label>node overlap</label><input id="f_ov" type="range" min="0" max="60" step="2" value="24"><span id="v_ov"></span></div>
+    <div class="row"><label>gravity</label><input id="f_grav" type="range" min="0" max="2" step="0.05" value="0.25"><span id="v_grav"></span></div>
+    <div><button id="rerun">re-run force layout</button></div>
+  </div>
+  <div id="legend"></div>
+  <div class="hint">Hover = quick note · click = focus (ring, in/out edges) · <b>Colour by</b> recolours (never hides) · <b>Show layer</b> dims non-members but keeps edges between active nodes · legend value dims a group.</div>
+</div>
+
+<div id="details" class="panel"></div>
+<div id="tip"></div>
+<div id="cy"></div>
+
+<script>
+  const G = window.KG || window.FCOS_GRAPH;   // window.KG is the generic global; FCOS_GRAPH kept for back-compat
+  if (G && G.title) document.querySelector('#controls h1').textContent = G.title;
+  const byId = Object.fromEntries(G.nodes.map(n => [n.id, n]));
+  const flat = (id) => (byId[id] ? byId[id].label.replace(/\n/g, ' ') : id);
+
+  // degree per node (hub sizing)
+  const deg = {}; G.nodes.forEach(n => deg[n.id] = 0);
+  G.edges.forEach(e => { deg[e.source]++; deg[e.target]++; });
+  const maxDeg = Math.max(...Object.values(deg));
+
+  // ---------- colour-by facet plumbing ----------
+  let colorBy = 'category';
+  const NONE = '—', GREY = '#c2c8cc';
+  function valueOf(id) {
+    if (colorBy === 'category') return byId[id].group;
+    const v = (byId[id].facets || {})[colorBy];
+    return v == null ? NONE : v;
+  }
+  function paletteEntries() {
+    const base = colorBy === 'category' ? Object.entries(G.groups) : Object.entries(G.facets[colorBy].values);
+    if (colorBy !== 'category' && G.nodes.some(n => (n.facets || {})[colorBy] == null)) base.push([NONE, GREY]);
+    return base;
+  }
+  function colorForNode(id) {
+    const v = valueOf(id);
+    if (colorBy === 'category') return G.groups[v] || '#777';
+    if (v === NONE) return GREY;
+    return G.facets[colorBy].values[v] || GREY;
+  }
+
+  const elements = [
+    ...G.nodes.map(n => ({ data: { id: n.id, label: n.label, group: n.group, color: colorForNode(n.id), deg: deg[n.id] } })),
+    ...G.edges.map((e, i) => ({ data: { id: 'e' + i, source: e.source, target: e.target, label: e.label } })),
+  ];
+
+  const cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements, wheelSensitivity: 0.2,
+    style: [
+      { selector: 'node', style: {
+        'background-color': 'data(color)', 'label': 'data(label)',
+        'color': '#ffffff', 'font-size': 8, 'font-weight': 'normal',
+        'text-wrap': 'wrap', 'text-max-width': 78, 'text-valign': 'center', 'text-halign': 'center',
+        'text-outline-color': 'data(color)', 'text-outline-width': 2.4, 'text-outline-opacity': 1,
+        'width': 'mapData(deg, 1, ' + maxDeg + ', 34, 78)', 'height': 'mapData(deg, 1, ' + maxDeg + ', 34, 78)',
+        'border-width': 1, 'border-color': 'rgba(255,255,255,0.7)',
+      }},
+      { selector: 'edge', style: {
+        'width': 1.4, 'line-color': '#b0b6bb', 'target-arrow-color': '#b0b6bb',
+        'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'arrow-scale': 0.9,
+      }},
+      { selector: '.faded', style: { 'opacity': 0.10, 'text-opacity': 0.06 } },
+      { selector: 'edge.eout, edge.ein', style: {
+        'label': 'data(label)', 'width': 2.6, 'z-index': 99, 'font-size': 7, 'text-rotation': 'none',
+        'text-background-color': '#ffffff', 'text-background-opacity': 1, 'text-background-shape': 'roundrectangle',
+        'text-background-padding': 2.5, 'text-border-color': '#cfd6db', 'text-border-width': 1, 'text-border-opacity': 1,
+      }},
+      { selector: 'edge.eout', style: { 'line-color': '#e53935', 'target-arrow-color': '#e53935', 'color': '#c62828' } },
+      { selector: 'edge.ein',  style: { 'line-color': '#1e88e5', 'target-arrow-color': '#1e88e5', 'color': '#1565c0' } },
+      { selector: 'node.nfocus', style: { 'border-width': 3.5, 'border-color': '#222', 'z-index': 100 } },
+    ],
+    layout: { name: 'preset' },
+  });
+  window.cy = cy;
+
+  // ---------- details side panel ----------
+  const details = document.getElementById('details');
+  const idle = 'Hover a node for a quick note.<br><br>Click a node to pin its full description and relationships here, and fan its connections into a ring.<br><br>Use <b>Colour by</b> to switch lens and <b>Show layer</b> to bring out a sub-story.';
+  const setIdle = () => details.innerHTML = '<div class="idle">' + idle + '</div>';
+  function renderDetails(id) {
+    const nd = byId[id], f = nd.facets || {};
+    const tags = [f.tier ? 'tier ' + f.tier : null, f.ecosystem, f.status, f.abstraction, f.stack]
+      .filter(Boolean).map(t => `<span class="tag">${t}</span>`).join('');
+    const lys = (nd.layers || []).map(k => `<span class="tag lyr">${G.layers[k].name}</span>`).join('');
+    const out = G.edges.filter(e => e.source === id).map(e => `<li><span class="v">${e.label}</span> &rarr; ${flat(e.target)}</li>`);
+    const inc = G.edges.filter(e => e.target === id).map(e => `<li>${flat(e.source)} <span class="vin">${e.label}</span> &rarr;</li>`);
+    details.innerHTML =
+      `<div class="dh"><span class="chip" style="background:${G.groups[nd.group]}"></span>${flat(id)}</div>` +
+      `<div class="grp">${nd.group}</div>` +
+      `<div class="tags">${tags}${lys}</div>` +
+      `<p class="desc">${nd.desc || ''}</p>` +
+      (out.length ? `<div class="sec out">outgoing &rarr; <span class="muted">(red)</span></div><ul>${out.join('')}</ul>` : '') +
+      (inc.length ? `<div class="sec in">&rarr; incoming <span class="muted">(blue)</span></div><ul>${inc.join('')}</ul>` : '');
+  }
+  setIdle();
+
+  // ---------- view state: emphasis by fade (edges between two ACTIVE nodes stay drawn) ----------
+  let currentLayer = '';
+  const enabled = new Set();            // enabled values for the current colour-by facet
+  function resetEnabled() { enabled.clear(); paletteEntries().forEach(([v]) => enabled.add(v)); }
+  function members(layerKey) { return new Set(G.nodes.filter(n => (n.layers || []).includes(layerKey)).map(n => n.id)); }
+
+  function clearLayerStyle() {
+    cy.nodes().removeStyle('border-color border-width');
+    cy.edges().forEach(e => e.removeStyle(
+      'line-color target-arrow-color color label width z-index font-size text-rotation text-background-color text-background-opacity text-background-shape text-background-padding text-border-color text-border-width text-border-opacity'));
+  }
+  function styleLayerEdge(e, color) {
+    e.style({ 'line-color': color, 'target-arrow-color': color, 'color': color, 'label': e.data('label'),
+      'width': 2.6, 'z-index': 99, 'font-size': 7, 'text-rotation': 'none', 'text-background-color': '#fff',
+      'text-background-opacity': 1, 'text-background-shape': 'roundrectangle', 'text-background-padding': 2.5,
+      'text-border-color': '#cfd6db', 'text-border-width': 1, 'text-border-opacity': 1 });
+  }
+  // recompute the active set + fade; an edge fades only if an endpoint is inactive
+  function applyView() {
+    pinned = null; setIdle();
+    cy.elements().removeClass('eout ein nfocus');
+    clearLayerStyle();
+    let active;
+    if (currentLayer) active = members(currentLayer);
+    else active = new Set(G.nodes.filter(n => enabled.has(valueOf(n.id))).map(n => n.id));
+    const all = !currentLayer && enabled.size === paletteEntries().length;
+    cy.batch(() => {
+      cy.nodes().forEach(n => n[(all || active.has(n.id())) ? 'removeClass' : 'addClass']('faded'));
+      cy.edges().forEach(e => {
+        const both = active.has(e.source().id()) && active.has(e.target().id());
+        e[(all || both) ? 'removeClass' : 'addClass']('faded');
+      });
+      if (currentLayer) {
+        const color = G.layers[currentLayer].color;
+        cy.nodes().forEach(n => { if (active.has(n.id())) { n.style('border-color', color); n.style('border-width', 3.2); } });
+        cy.edges().forEach(e => { if (active.has(e.source().id()) && active.has(e.target().id())) styleLayerEdge(e, color); });
+      }
+    });
+  }
+
+  function recolor() {
+    cy.batch(() => cy.nodes().forEach(n => n.data('color', colorForNode(n.id()))));
+  }
+
+  // ---------- node focus (ring + directional edges) ----------
+  let pinned = null;
+  function isolate(n) {
+    // focus is exclusive with layer highlight
+    currentLayer = ''; document.getElementById('layer').value = '';
+    clearLayerStyle();
+    pinned = n.id();
+    const nhood = n.closedNeighborhood();
+    cy.batch(() => {
+      cy.elements().addClass('faded').removeClass('eout ein nfocus');
+      nhood.removeClass('faded');
+      n.outgoers('edge').addClass('eout');
+      n.incomers('edge').addClass('ein');
+      n.addClass('nfocus');
+    });
+    nhood.nodes().layout({ name: 'concentric', concentric: (ele) => (ele.id() === n.id() ? 10 : 1),
+      levelWidth: () => 1, minNodeSpacing: 48, animate: true, animationDuration: 400, fit: true, padding: 70 }).run();
+    renderDetails(n.id());
+  }
+  function unfocus() {
+    cy.nodes().forEach(n => { const p = n.scratch('_pos'); if (p) n.animate({ position: p }, { duration: 400 }); });
+    cy.animate({ fit: { padding: 40 } }, { duration: 400 });
+    applyView();  // restore whatever lens/filter/layer was active
+  }
+  cy.on('tap', 'node', (e) => isolate(e.target));
+  cy.on('tap', (e) => { if (e.target === cy) unfocus(); });
+
+  // hover tooltip
+  const tip = document.getElementById('tip'), cyDiv = document.getElementById('cy');
+  function showTip(n, rp) {
+    tip.innerHTML = `<b>${flat(n.id())}</b><br>${byId[n.id()].short || ''}`;
+    tip.style.display = 'block';
+    const r = cyDiv.getBoundingClientRect();
+    let x = r.left + rp.x + 14, y = r.top + rp.y + 14;
+    if (x + tip.offsetWidth > window.innerWidth - 8) x = window.innerWidth - 8 - tip.offsetWidth;
+    if (y + tip.offsetHeight > window.innerHeight - 8) y = window.innerHeight - 8 - tip.offsetHeight;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  cy.on('mouseover', 'node', (e) => showTip(e.target, e.renderedPosition || e.target.renderedPosition()));
+  cy.on('mousemove', 'node', (e) => { if (tip.style.display === 'block') showTip(e.target, e.renderedPosition || e.target.renderedPosition()); });
+  cy.on('mouseout', 'node', () => { tip.style.display = 'none'; });
+
+  // ---------- force layout ----------
+  const forceOpts = () => ({ name: 'cose', animate: true, padding: 40, randomize: true,
+    nodeRepulsion: +f_rep.value, idealEdgeLength: +f_len.value, edgeElasticity: +f_el.value,
+    nodeOverlap: +f_ov.value, gravity: +f_grav.value, componentSpacing: 60, numIter: 1200, nestingFactor: 0.9 });
+  let capture = false;
+  cy.on('layoutstop', () => { if (capture) { cy.nodes().forEach(n => n.scratch('_pos', Object.assign({}, n.position()))); capture = false; } });
+  function runForce() { capture = true; cy.layout(forceOpts()).run(); }
+
+  // ---------- legend (for current colour-by facet); values dim, not hide ----------
+  const legend = document.getElementById('legend');
+  function buildLegend() {
+    const entries = paletteEntries();
+    legend.innerHTML = entries.map(([v, c]) =>
+      `<div class="lg" data-val="${v}"><span class="chip" style="background:${c}"></span>` +
+      `<span class="lgname">${v}</span><span class="only" data-val="${v}">only</span></div>`).join('');
+    refreshLegendState();
+    legend.querySelectorAll('.lgname').forEach(name => name.addEventListener('click', (ev) => {
+      const v = ev.target.closest('.lg').getAttribute('data-val');
+      enabled.has(v) ? enabled.delete(v) : enabled.add(v);
+      if (enabled.size === 0) resetEnabled();       // never empty
+      refreshLegendState(); applyView();
+    }));
+    legend.querySelectorAll('.only').forEach(btn => btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const v = ev.target.getAttribute('data-val');
+      const isOnly = enabled.size === 1 && enabled.has(v);
+      enabled.clear(); if (isOnly) resetEnabled(); else enabled.add(v);
+      refreshLegendState(); applyView();
+    }));
+  }
+  function refreshLegendState() {
+    legend.querySelectorAll('.lg').forEach(row => {
+      const v = row.getAttribute('data-val');
+      row.classList.toggle('off', !enabled.has(v));
+      row.querySelector('.only').classList.toggle('active', enabled.size === 1 && enabled.has(v));
+    });
+  }
+
+  // ---------- controls ----------
+  const cbSel = document.getElementById('colorby');
+  cbSel.innerHTML = '<option value="category">Category</option>' +
+    Object.entries(G.facets).map(([k, f]) => `<option value="${k}">${f.name}</option>`).join('');
+  cbSel.addEventListener('change', () => { colorBy = cbSel.value; resetEnabled(); recolor(); buildLegend(); applyView(); });
+
+  const lySel = document.getElementById('layer');
+  lySel.innerHTML = '<option value="">— none —</option>' +
+    Object.entries(G.layers).map(([k, l]) => `<option value="${k}">${l.name}</option>`).join('');
+  lySel.addEventListener('change', () => { currentLayer = lySel.value; applyView(); });
+
+  document.querySelectorAll('#controls button[data-layout]').forEach(b => b.addEventListener('click', () => {
+    const name = b.getAttribute('data-layout');
+    if (name === 'cose') return runForce();
+    const opts = { name, animate: true, padding: 40 };
+    if (name === 'concentric') Object.assign(opts, { concentric: (n) => n.degree(), levelWidth: () => 3, minNodeSpacing: 40 });
+    if (name === 'breadthfirst') Object.assign(opts, { directed: true, spacingFactor: 1.1 });
+    capture = true; cy.layout(opts).run();
+  }));
+  const syncLabels = () => { v_rep.textContent = f_rep.value; v_len.textContent = f_len.value; v_el.textContent = f_el.value;
+    v_ov.textContent = f_ov.value; v_grav.textContent = (+f_grav.value).toFixed(2); };
+  ['f_rep','f_len','f_el','f_ov','f_grav'].forEach(id => document.getElementById(id).addEventListener('input', syncLabels));
+  document.getElementById('rerun').addEventListener('click', runForce);
+  document.getElementById('toggleForces').addEventListener('click', (e) => {
+    const f = document.getElementById('forces'); const open = f.style.display === 'block';
+    f.style.display = open ? 'none' : 'block'; e.target.textContent = open ? 'force tuning ▾' : 'force tuning ▴';
+  });
+  document.getElementById('png').addEventListener('click', () => {
+    const a = document.createElement('a'); a.href = cy.png({ full: true, scale: 2, bg: '#ffffff' });
+    a.download = 'fcos-knowledge-graph.png'; a.click();
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    currentLayer = ''; lySel.value = ''; resetEnabled(); refreshLegendState(); applyView();
+  });
+  const dl = document.getElementById('nodelist');
+  dl.innerHTML = G.nodes.map(n => `<option value="${flat(n.id)}">`).join('');
+  document.getElementById('search').addEventListener('change', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    const hit = G.nodes.find(n => flat(n.id).toLowerCase() === q) || G.nodes.find(n => flat(n.id).toLowerCase().includes(q));
+    if (hit) { const n = cy.$id(hit.id); cy.center(n); isolate(n); }
+  });
+
+  resetEnabled(); buildLegend(); syncLabels(); runForce();
+</script>
+</body>
+</html>
