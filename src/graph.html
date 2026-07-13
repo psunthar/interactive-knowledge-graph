@@ -80,8 +80,14 @@
   <input id="search" list="nodelist" placeholder="search a node…" />
   <datalist id="nodelist"></datalist>
   <div class="fld"><label>Colour by</label><select id="colorby"></select></div>
+  <div class="fld"><label>Size by</label><select id="sizeby">
+    <option value="out">Descendants (influence)</option>
+    <option value="in">Ancestors (depends-on)</option>
+    <option value="deg">Connections (degree)</option>
+  </select></div>
   <div class="fld"><label>Show layer</label><select id="layer"></select></div>
   <div style="margin-top:6px">
+    <button id="back" disabled>◀ back</button>
     <button id="toggleForces">force tuning ▾</button>
     <button id="png">save PNG</button>
     <button id="reset">reset</button>
@@ -113,24 +119,29 @@
   G.edges.forEach(e => { deg[e.source]++; deg[e.target]++; });
   const maxDeg = Math.max(...Object.values(deg));
 
-  // reach = number of DESCENDANTS reachable by following OUTGOING edges (children,
-  // and their children, across all generations). Cycle-safe. This is what sizes a
-  // node: a root that everything flows out of gets the largest diameter.
-  const outBySrc = {}; G.nodes.forEach(n => outBySrc[n.id] = []);
-  G.edges.forEach(e => { if (outBySrc[e.source]) outBySrc[e.source].push(e.target); });
-  function reachOf(id) {
-    const seen = new Set(); const stack = outBySrc[id].slice();
+  // Reach metrics via cycle-safe transitive closure:
+  //   out = DESCENDANTS  (children across all generations, following OUTGOING edges) -> "influence"
+  //   in  = ANCESTORS    (everything that leads into a node, following INCOMING edges) -> "depends-on"
+  // The size metric is switchable ("Size by"); it also roots the concentric/tree layouts.
+  const outBySrc = {}, inByTgt = {};
+  G.nodes.forEach(n => { outBySrc[n.id] = []; inByTgt[n.id] = []; });
+  G.edges.forEach(e => { if (outBySrc[e.source]) outBySrc[e.source].push(e.target); if (inByTgt[e.target]) inByTgt[e.target].push(e.source); });
+  function closureSize(id, adj) {
+    const seen = new Set(); const stack = (adj[id] || []).slice();
     while (stack.length) {
       const t = stack.pop();
       if (seen.has(t)) continue;
       seen.add(t);
-      for (const nx of (outBySrc[t] || [])) if (!seen.has(nx)) stack.push(nx);
+      for (const nx of (adj[t] || [])) if (!seen.has(nx)) stack.push(nx);
     }
     return seen.size;
   }
-  const reach = {}; G.nodes.forEach(n => reach[n.id] = reachOf(n.id));
-  const maxReach = Math.max(1, ...Object.values(reach));
-  const maxReachId = Object.keys(reach).sort((a, b) => reach[b] - reach[a])[0];
+  const reachOut = {}, reachIn = {};
+  G.nodes.forEach(n => { reachOut[n.id] = closureSize(n.id, outBySrc); reachIn[n.id] = closureSize(n.id, inByTgt); });
+  const METRICS = { out: reachOut, in: reachIn, deg: deg };
+  let sizeBy = 'out';
+  const metric = () => METRICS[sizeBy];
+  const maxMetricId = () => Object.keys(metric()).sort((a, b) => metric()[b] - metric()[a])[0];
 
   // ---------- colour-by facet plumbing ----------
   let colorBy = 'category';
@@ -153,7 +164,7 @@
   }
 
   const elements = [
-    ...G.nodes.map(n => ({ data: { id: n.id, label: n.label, group: n.group, color: colorForNode(n.id), deg: deg[n.id], reach: reach[n.id] } })),
+    ...G.nodes.map(n => ({ data: { id: n.id, label: n.label, group: n.group, color: colorForNode(n.id), sizeVal: 0 } })),
     ...G.edges.map((e, i) => ({ data: { id: 'e' + i, source: e.source, target: e.target, label: e.label } })),
   ];
 
@@ -166,9 +177,8 @@
         'color': '#ffffff', 'font-size': 8, 'font-weight': 'normal',
         'text-wrap': 'wrap', 'text-max-width': 78, 'text-valign': 'center', 'text-halign': 'center',
         'text-outline-color': 'data(color)', 'text-outline-width': 2.4, 'text-outline-opacity': 1,
-        // diameter scales with descendant-reach (see reachOf): the source of the
-        // largest outgoing subtree is the biggest node.
-        'width': 'mapData(reach, 0, ' + maxReach + ', 26, 88)', 'height': 'mapData(reach, 0, ' + maxReach + ', 26, 88)',
+        // diameter driven by the current "Size by" metric (normalised 0..100 in sizeVal)
+        'width': 'mapData(sizeVal, 0, 100, 26, 88)', 'height': 'mapData(sizeVal, 0, 100, 26, 88)',
         'border-width': 1, 'border-color': 'rgba(255,255,255,0.7)',
       }},
       { selector: 'edge', style: {
@@ -253,12 +263,17 @@
   function recolor() {
     cy.batch(() => cy.nodes().forEach(n => n.data('color', colorForNode(n.id()))));
   }
+  function applySize() {
+    const m = metric(); const mx = Math.max(1, ...Object.values(m));
+    cy.batch(() => cy.nodes().forEach(n => n.data('sizeVal', 100 * (m[n.id()] || 0) / mx)));
+  }
 
-  // ---------- node focus (ring + directional edges) ----------
+  // ---------- node focus (ring + directional edges) + back-navigation ----------
   let pinned = null;
-  function isolate(n) {
-    // focus is exclusive with layer highlight
-    currentLayer = ''; document.getElementById('layer').value = '';
+  const trail = [];   // history of focused node ids — "where I came from"
+  function focusNode(n, record) {
+    if (record && pinned && pinned !== n.id()) trail.push(pinned);   // remember where we were
+    currentLayer = ''; document.getElementById('layer').value = '';  // focus is exclusive with a layer
     clearLayerStyle();
     pinned = n.id();
     const nhood = n.closedNeighborhood();
@@ -272,14 +287,33 @@
     nhood.nodes().layout({ name: 'concentric', concentric: (ele) => (ele.id() === n.id() ? 10 : 1),
       levelWidth: () => 1, minNodeSpacing: 48, animate: true, animationDuration: 400, fit: true, padding: 70 }).run();
     renderDetails(n.id());
+    updateBack();
+  }
+  function goBack() {
+    while (trail.length) {
+      const n = cy.$id(trail.pop());
+      if (n && n.nonempty()) { focusNode(n, false); return; }   // return to the previous node, without re-recording
+    }
+    unfocus();   // trail empty → back to the overview
   }
   function unfocus() {
+    pinned = null; trail.length = 0;
     cy.nodes().forEach(n => { const p = n.scratch('_pos'); if (p) n.animate({ position: p }, { duration: 400 }); });
     cy.animate({ fit: { padding: 40 } }, { duration: 400 });
     applyView();  // restore whatever lens/filter/layer was active
+    updateBack();
   }
-  cy.on('tap', 'node', (e) => isolate(e.target));
+  function updateBack() {
+    const b = document.getElementById('back');
+    if (b) { b.disabled = trail.length === 0; b.textContent = trail.length ? ('◀ back (' + trail.length + ')') : '◀ back'; }
+  }
+  cy.on('tap', 'node', (e) => focusNode(e.target, true));
   cy.on('tap', (e) => { if (e.target === cy) unfocus(); });
+  window.addEventListener('keydown', (e) => {
+    if ((e.key === 'Backspace' || e.key === 'Escape') && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+      e.preventDefault(); goBack();
+    }
+  });
 
   // hover tooltip
   const tip = document.getElementById('tip'), cyDiv = document.getElementById('cy');
@@ -340,6 +374,9 @@
     Object.entries(G.facets).map(([k, f]) => `<option value="${k}">${f.name}</option>`).join('');
   cbSel.addEventListener('change', () => { colorBy = cbSel.value; resetEnabled(); recolor(); buildLegend(); applyView(); });
 
+  document.getElementById('sizeby').addEventListener('change', (e) => { sizeBy = e.target.value; applySize(); });
+  document.getElementById('back').addEventListener('click', goBack);
+
   const lySel = document.getElementById('layer');
   lySel.innerHTML = '<option value="">— none —</option>' +
     Object.entries(G.layers).map(([k, l]) => `<option value="${k}">${l.name}</option>`).join('');
@@ -349,10 +386,10 @@
     const name = b.getAttribute('data-layout');
     if (name === 'cose') return runForce();
     const opts = { name, animate: true, padding: 40 };
-    // concentric: rank rings by descendant-reach (largest reach in the centre)
-    if (name === 'concentric') Object.assign(opts, { concentric: (n) => reach[n.id()], levelWidth: () => 3, minNodeSpacing: 40 });
-    // tree-ish: root the tree at the highest-reach node -> largest on top, smaller below
-    if (name === 'breadthfirst') Object.assign(opts, { directed: true, spacingFactor: 1.1, roots: maxReachId ? ('#' + maxReachId) : undefined });
+    // concentric: rank rings by the current size metric (largest in the centre)
+    if (name === 'concentric') Object.assign(opts, { concentric: (n) => metric()[n.id()], levelWidth: () => 3, minNodeSpacing: 40 });
+    // tree-ish: root the tree at the highest-metric node -> largest on top, smaller below
+    if (name === 'breadthfirst') { const r = maxMetricId(); Object.assign(opts, { directed: true, spacingFactor: 1.1, roots: r ? ('#' + r) : undefined }); }
     capture = true; cy.layout(opts).run();
   }));
   const syncLabels = () => { v_rep.textContent = f_rep.value; v_len.textContent = f_len.value; v_el.textContent = f_el.value;
@@ -365,7 +402,7 @@
   });
   document.getElementById('png').addEventListener('click', () => {
     const a = document.createElement('a'); a.href = cy.png({ full: true, scale: 2, bg: '#ffffff' });
-    a.download = 'fcos-knowledge-graph.png'; a.click();
+    a.download = ((G.title || 'knowledge-graph').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'graph') + '.png'; a.click();
   });
   document.getElementById('reset').addEventListener('click', () => {
     currentLayer = ''; lySel.value = ''; resetEnabled(); refreshLegendState(); applyView();
@@ -375,10 +412,10 @@
   document.getElementById('search').addEventListener('change', (e) => {
     const q = e.target.value.trim().toLowerCase();
     const hit = G.nodes.find(n => flat(n.id).toLowerCase() === q) || G.nodes.find(n => flat(n.id).toLowerCase().includes(q));
-    if (hit) { const n = cy.$id(hit.id); cy.center(n); isolate(n); }
+    if (hit) { const n = cy.$id(hit.id); cy.center(n); focusNode(n, true); }
   });
 
-  resetEnabled(); buildLegend(); syncLabels(); runForce();
+  resetEnabled(); buildLegend(); applySize(); syncLabels(); runForce();
 </script>
 </body>
 </html>
