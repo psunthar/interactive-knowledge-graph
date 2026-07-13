@@ -73,7 +73,7 @@
 <body>
 <div id="sidebar">
   <div id="controls">
-    <div id="ctrlhdr"><span id="ctrltitle">Knowledge graph</span><span id="collapseCtrls" title="collapse settings">▾</span></div>
+    <div id="ctrlhdr"><span id="ctrltitle">Knowledge graph</span><span id="collapseCtrls" title="collapse settings">⚙ ▾</span></div>
     <div id="ctrlbody">
       <div>Layout:
         <div>
@@ -121,7 +121,7 @@
   if (G && G.title) document.getElementById('ctrltitle').textContent = G.title;
   document.getElementById('ctrlhdr').addEventListener('click', () => {
     const c = document.getElementById('controls'); c.classList.toggle('collapsed');
-    document.getElementById('collapseCtrls').textContent = c.classList.contains('collapsed') ? '▸' : '▾';
+    document.getElementById('collapseCtrls').textContent = c.classList.contains('collapsed') ? '⚙ ▸' : '⚙ ▾';
   });
   const byId = Object.fromEntries(G.nodes.map(n => [n.id, n]));
   const flat = (id) => (byId[id] ? byId[id].label.replace(/\n/g, ' ') : id);
@@ -198,7 +198,9 @@
         'width': 1.4, 'line-color': '#b0b6bb', 'target-arrow-color': '#b0b6bb',
         'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'arrow-scale': 0.9,
       }},
-      { selector: '.faded', style: { 'opacity': 0.10, 'text-opacity': 0.06 } },
+      // faded = backgrounded; make it non-interactive so it can't steal clicks/hovers
+      // meant for the foreground (fixes clicking a ring node landing on a dimmed node behind it)
+      { selector: '.faded', style: { 'opacity': 0.10, 'text-opacity': 0.06, 'events': 'no' } },
       { selector: 'edge.eout, edge.ein', style: {
         'label': 'data(label)', 'width': 2.6, 'z-index': 99, 'font-size': 7, 'text-rotation': 'none',
         'text-background-color': '#ffffff', 'text-background-opacity': 1, 'text-background-shape': 'roundrectangle',
