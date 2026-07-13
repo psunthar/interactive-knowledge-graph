@@ -6,11 +6,17 @@
 <title>Knowledge graph — Cytoscape.js</title>
 <style>
   html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
-  #cy { position: absolute; top: 0; bottom: 0; left: 0; right: 320px; }
-  .panel { position: absolute; z-index: 10; background: rgba(255,255,255,0.96);
-    border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.15); font-size: 12px; }
-  #controls { top: 10px; left: 10px; padding: 10px 12px; max-width: 250px; max-height: 94vh; overflow-y: auto; }
-  #controls h1 { font-size: 13px; margin: 0 0 6px; }
+  #cy { position: absolute; top: 0; bottom: 0; left: 0; right: 340px; }
+  /* right-hand sidebar holds the collapsible settings on top and the details below */
+  #sidebar { position: absolute; top: 0; right: 0; width: 340px; height: 100%; z-index: 10;
+    display: flex; flex-direction: column; background: #fff; border-left: 1px solid #ddd;
+    box-shadow: -2px 0 8px rgba(0,0,0,.08); font-size: 12px; }
+  #controls { padding: 8px 12px 10px; border-bottom: 1px solid #e6e6e6; overflow-y: auto; max-height: 64%; flex-shrink: 0; }
+  #controls.collapsed #ctrlbody { display: none; }
+  #ctrlhdr { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+  #ctrltitle { font-size: 13px; font-weight: 700; }
+  #collapseCtrls { font-size: 13px; color: #666; }
+  #ctrlbody { margin-top: 6px; }
   #controls button { font-size: 11px; margin: 2px 2px 0 0; cursor: pointer; }
   #controls select, #search { font-size: 12px; padding: 2px 4px; }
   .fld { margin-top: 6px; } .fld label { color:#444; margin-right: 4px; }
@@ -30,8 +36,7 @@
   .chip { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
   .hint { color: #555; margin-top: 8px; }
 
-  #details { top: 0; right: 0; width: 300px; height: 100%; border-radius: 0; border-left: 1px solid #ddd;
-    padding: 14px 16px; overflow-y: auto; box-shadow: -2px 0 8px rgba(0,0,0,.08); }
+  #details { flex: 1; min-height: 0; padding: 14px 16px; overflow-y: auto; }
   #details .dh { font-size: 16px; font-weight: 700; display: flex; align-items: center; }
   #details .dh .chip { width: 14px; height: 14px; }
   #details .grp { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin: 2px 0 8px 19px; }
@@ -66,51 +71,58 @@
 </script>
 </head>
 <body>
-<div id="controls" class="panel">
-  <h1>Knowledge graph</h1>
-  <div>Layout:
-    <div>
-      <button data-layout="cose">force</button>
-      <button data-layout="concentric">concentric</button>
-      <button data-layout="breadthfirst">tree-ish</button>
-      <button data-layout="circle">circle</button>
-      <button data-layout="grid">grid</button>
+<div id="sidebar">
+  <div id="controls">
+    <div id="ctrlhdr"><span id="ctrltitle">Knowledge graph</span><span id="collapseCtrls" title="collapse settings">▾</span></div>
+    <div id="ctrlbody">
+      <div>Layout:
+        <div>
+          <button data-layout="cose">force</button>
+          <button data-layout="concentric">concentric</button>
+          <button data-layout="breadthfirst">tree-ish</button>
+          <button data-layout="circle">circle</button>
+          <button data-layout="grid">grid</button>
+        </div>
+      </div>
+      <input id="search" list="nodelist" placeholder="search a node…" />
+      <datalist id="nodelist"></datalist>
+      <div class="fld"><label>Colour by</label><select id="colorby"></select></div>
+      <div class="fld"><label>Size by</label><select id="sizeby">
+        <option value="out">Descendants (influence)</option>
+        <option value="in">Ancestors (depends-on)</option>
+        <option value="deg">Connections (degree)</option>
+      </select></div>
+      <div class="fld"><label>Show layer</label><select id="layer"></select></div>
+      <div style="margin-top:6px">
+        <button id="back" disabled>◀ back</button>
+        <button id="toggleForces">force tuning ▾</button>
+        <button id="png">save PNG</button>
+        <button id="reset">reset</button>
+      </div>
+      <div id="forces">
+        <div class="row"><label>node repulsion</label><input id="f_rep" type="range" min="1000" max="40000" step="500" value="14000"><span id="v_rep"></span></div>
+        <div class="row"><label>edge length</label><input id="f_len" type="range" min="40" max="320" step="10" value="150"><span id="v_len"></span></div>
+        <div class="row"><label>spring const</label><input id="f_el" type="range" min="0" max="200" step="5" value="35"><span id="v_el"></span></div>
+        <div class="row"><label>node overlap</label><input id="f_ov" type="range" min="0" max="60" step="2" value="24"><span id="v_ov"></span></div>
+        <div class="row"><label>gravity</label><input id="f_grav" type="range" min="0" max="2" step="0.05" value="0.25"><span id="v_grav"></span></div>
+        <div><button id="rerun">re-run force layout</button></div>
+      </div>
+      <div id="legend"></div>
+      <div class="hint">Hover = quick note · click = focus (ring, in/out edges) · <b>Colour by</b> recolours (never hides) · <b>Show layer</b> dims non-members but keeps edges between active nodes · legend value dims a group.</div>
     </div>
   </div>
-  <input id="search" list="nodelist" placeholder="search a node…" />
-  <datalist id="nodelist"></datalist>
-  <div class="fld"><label>Colour by</label><select id="colorby"></select></div>
-  <div class="fld"><label>Size by</label><select id="sizeby">
-    <option value="out">Descendants (influence)</option>
-    <option value="in">Ancestors (depends-on)</option>
-    <option value="deg">Connections (degree)</option>
-  </select></div>
-  <div class="fld"><label>Show layer</label><select id="layer"></select></div>
-  <div style="margin-top:6px">
-    <button id="back" disabled>◀ back</button>
-    <button id="toggleForces">force tuning ▾</button>
-    <button id="png">save PNG</button>
-    <button id="reset">reset</button>
-  </div>
-  <div id="forces">
-    <div class="row"><label>node repulsion</label><input id="f_rep" type="range" min="1000" max="40000" step="500" value="14000"><span id="v_rep"></span></div>
-    <div class="row"><label>edge length</label><input id="f_len" type="range" min="40" max="320" step="10" value="150"><span id="v_len"></span></div>
-    <div class="row"><label>spring const</label><input id="f_el" type="range" min="0" max="200" step="5" value="35"><span id="v_el"></span></div>
-    <div class="row"><label>node overlap</label><input id="f_ov" type="range" min="0" max="60" step="2" value="24"><span id="v_ov"></span></div>
-    <div class="row"><label>gravity</label><input id="f_grav" type="range" min="0" max="2" step="0.05" value="0.25"><span id="v_grav"></span></div>
-    <div><button id="rerun">re-run force layout</button></div>
-  </div>
-  <div id="legend"></div>
-  <div class="hint">Hover = quick note · click = focus (ring, in/out edges) · <b>Colour by</b> recolours (never hides) · <b>Show layer</b> dims non-members but keeps edges between active nodes · legend value dims a group.</div>
+  <div id="details"></div>
 </div>
-
-<div id="details" class="panel"></div>
 <div id="tip"></div>
 <div id="cy"></div>
 
 <script>
   const G = window.KG || window.FCOS_GRAPH;   // window.KG is the generic global; FCOS_GRAPH kept for back-compat
-  if (G && G.title) document.querySelector('#controls h1').textContent = G.title;
+  if (G && G.title) document.getElementById('ctrltitle').textContent = G.title;
+  document.getElementById('ctrlhdr').addEventListener('click', () => {
+    const c = document.getElementById('controls'); c.classList.toggle('collapsed');
+    document.getElementById('collapseCtrls').textContent = c.classList.contains('collapsed') ? '▸' : '▾';
+  });
   const byId = Object.fromEntries(G.nodes.map(n => [n.id, n]));
   const flat = (id) => (byId[id] ? byId[id].label.replace(/\n/g, ' ') : id);
 
@@ -140,6 +152,7 @@
   G.nodes.forEach(n => { reachOut[n.id] = closureSize(n.id, outBySrc); reachIn[n.id] = closureSize(n.id, inByTgt); });
   const METRICS = { out: reachOut, in: reachIn, deg: deg };
   let sizeBy = 'out';
+  let currentLayout = 'cose';   // which layout is active, so a metric change can re-run it
   const metric = () => METRICS[sizeBy];
   const maxMetricId = () => Object.keys(metric()).sort((a, b) => metric()[b] - metric()[a])[0];
 
@@ -336,7 +349,7 @@
     nodeOverlap: +f_ov.value, gravity: +f_grav.value, componentSpacing: 60, numIter: 1200, nestingFactor: 0.9 });
   let capture = false;
   cy.on('layoutstop', () => { if (capture) { cy.nodes().forEach(n => n.scratch('_pos', Object.assign({}, n.position()))); capture = false; } });
-  function runForce() { capture = true; cy.layout(forceOpts()).run(); }
+  function runForce() { currentLayout = 'cose'; capture = true; cy.layout(forceOpts()).run(); }
 
   // ---------- legend (for current colour-by facet); values dim, not hide ----------
   const legend = document.getElementById('legend');
@@ -374,7 +387,10 @@
     Object.entries(G.facets).map(([k, f]) => `<option value="${k}">${f.name}</option>`).join('');
   cbSel.addEventListener('change', () => { colorBy = cbSel.value; resetEnabled(); recolor(); buildLegend(); applyView(); });
 
-  document.getElementById('sizeby').addEventListener('change', (e) => { sizeBy = e.target.value; applySize(); });
+  document.getElementById('sizeby').addEventListener('change', (e) => {
+    sizeBy = e.target.value; applySize();
+    if (!pinned) runLayout(currentLayout);   // re-run the active layout so positions reflect the new sizes
+  });
   document.getElementById('back').addEventListener('click', goBack);
 
   const lySel = document.getElementById('layer');
@@ -382,16 +398,27 @@
     Object.entries(G.layers).map(([k, l]) => `<option value="${k}">${l.name}</option>`).join('');
   lySel.addEventListener('change', () => { currentLayer = lySel.value; applyView(); });
 
-  document.querySelectorAll('#controls button[data-layout]').forEach(b => b.addEventListener('click', () => {
-    const name = b.getAttribute('data-layout');
+  function runLayout(name) {
+    currentLayout = name;
     if (name === 'cose') return runForce();
     const opts = { name, animate: true, padding: 40 };
     // concentric: rank rings by the current size metric (largest in the centre)
     if (name === 'concentric') Object.assign(opts, { concentric: (n) => metric()[n.id()], levelWidth: () => 3, minNodeSpacing: 40 });
     // tree-ish: root the tree at the highest-metric node -> largest on top, smaller below
     if (name === 'breadthfirst') { const r = maxMetricId(); Object.assign(opts, { directed: true, spacingFactor: 1.1, roots: r ? ('#' + r) : undefined }); }
+    // circle: order by the size metric, largest at 12 o'clock, decreasing clockwise.
+    // (Built manually — cytoscape's circle `sort` was unreliable here.)
+    if (name === 'circle') {
+      const ordered = G.nodes.map(n => n.id).sort((a, b) => metric()[b] - metric()[a]);
+      const N = ordered.length, R = Math.max(300, N * 14), pos = {};
+      ordered.forEach((id, i) => { const th = 2 * Math.PI * i / N; pos[id] = { x: R * Math.sin(th), y: -R * Math.cos(th) }; });
+      capture = true;
+      cy.layout({ name: 'preset', positions: (n) => pos[n.id()], animate: true, animationDuration: 500, fit: true, padding: 40 }).run();
+      return;
+    }
     capture = true; cy.layout(opts).run();
-  }));
+  }
+  document.querySelectorAll('#controls button[data-layout]').forEach(b => b.addEventListener('click', () => runLayout(b.getAttribute('data-layout'))));
   const syncLabels = () => { v_rep.textContent = f_rep.value; v_len.textContent = f_len.value; v_el.textContent = f_el.value;
     v_ov.textContent = f_ov.value; v_grav.textContent = (+f_grav.value).toFixed(2); };
   ['f_rep','f_len','f_el','f_ov','f_grav'].forEach(id => document.getElementById(id).addEventListener('input', syncLabels));
